@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-import motor.motor_asyncio
+from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, File, status
+from fastapi.responses import StreamingResponse
+from motor.motor_asyncio import AsyncIOMotorClient
 import io
 import uuid
+from pdf2image import convert_from_bytes
 import PyPDF2
 from app.utils.minio import get_minio_client, MinioClient
 from app.logger import get_logger
@@ -24,7 +26,7 @@ logger = get_logger()
 settings = get_settings()
 
 # MongoDB client setup
-mongo_client = motor.motor_asyncio.AsyncIOMotorClient(settings.get_mongo_uri())
+mongo_client = AsyncIOMotorClient(settings.get_mongo_uri())
 mongo_db = mongo_client[settings.MONGO_DB]
 resumes_collection = mongo_db[settings.MONGO_COLLECTION_RESUMES]
 
@@ -121,4 +123,54 @@ async def get_resume_download_link(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate download link"
+        )
+
+@router.get("/{resume_id}/preview", response_class=StreamingResponse)
+async def get_resume_preview_image(
+    resume_id: str = Path(..., title="Resume ID", description="The ID of the resume to preview"),
+    minio_client: MinioClient = Depends(get_minio_client),
+    db: Session = Depends(get_db)
+):
+    """Get a preview image of the first page of a resume"""
+    try:
+        # Get the MinIO resume ID from PostgreSQL
+        resume_upload = db.query(ResumeUploads).filter(ResumeUploads.id == resume_id).first()
+        
+        if not resume_upload:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume not found"
+            )
+            
+        minio_resume_id = resume_upload.minio_resume_id
+        
+        # Retrieve the PDF from MinIO
+        pdf_content = minio_client.get_file_content(str(minio_resume_id))
+        
+        # Convert the first page of the PDF to image
+        images = convert_from_bytes(pdf_content, first_page=1, last_page=1)
+        
+        if not images:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate preview image"
+            )
+        
+        # Take the first page and convert to JPEG
+        first_page = images[0]
+        img_byte_arr = io.BytesIO()
+        first_page.save(img_byte_arr, format='JPEG')
+        img_byte_arr.seek(0)
+        
+        # Return the image
+        return StreamingResponse(
+            content=img_byte_arr,
+            media_type="image/jpeg"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to generate resume preview image: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate resume preview image: {str(e)}"
         )
