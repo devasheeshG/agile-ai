@@ -5,17 +5,11 @@ from sqlalchemy.exc import IntegrityError
 from app.utils.postgres import Users, get_db
 from app.utils.minio import get_minio_client, MinioClient
 from app.logger import get_logger
-from app.utils.models import (
-    UserRole,
-    CreateUserRequest,
-    CreateUserResponse,
-    GetUsersResponse,
-    GetUserRequest,
-    GetUserResponse,
-    UpdateUserRequest,
-    UpdateUserResponse,
-    DeleteUserRequest,
-    UserWithId,
+from app.utils.models.users import (
+    UserCreate,
+    UserUpdate,
+    User,
+    UserListResponse,
 )
 
 router = APIRouter(
@@ -26,37 +20,21 @@ router = APIRouter(
 logger = get_logger()
 minio_client = get_minio_client()
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=User)
 async def create_user(
-    request: CreateUserRequest,
+    user_data: UserCreate,
     db: Session = Depends(get_db)
-) -> CreateUserResponse:
+):
     """Create a new user"""
     try:
         # Create a new user
-        user_data = request.user
-        db_user = Users(
-            name=user_data.name,
-            email=user_data.email,
-            notes=user_data.notes,
-            minio_resume_id=user_data.minio_resume_id,
-            role=user_data.role
-        )
+        db_user = Users(**user_data.model_dump())
         
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
         
-        return CreateUserResponse(
-            user=UserWithId(
-                id=db_user.id,
-                name=db_user.name,
-                email=db_user.email,
-                notes=db_user.notes,
-                minio_resume_id=db_user.minio_resume_id,
-                role=db_user.role
-            )
-        )
+        return db_user
 
     except IntegrityError:
         db.rollback()
@@ -73,24 +51,14 @@ async def create_user(
             detail="Failed to create user"
         )
 
-@router.get("")
+@router.get("", response_model=UserListResponse)
 async def get_all_users(
     db: Session = Depends(get_db)
-) -> GetUsersResponse:
+):
     """Get all users"""
     try:
         db_users = db.query(Users).all()
-        
-        users = [UserWithId(
-            id=user.id,
-            name=user.name,
-            email=user.email,
-            notes=user.notes or "",
-            minio_resume_id=user.minio_resume_id,
-            role=user.role
-        ) for user in db_users]
-        
-        return GetUsersResponse(users=users)
+        return UserListResponse(users=db_users)
     
     except Exception as e:
         logger.error(f"Error retrieving users: {str(e)}")
@@ -99,14 +67,14 @@ async def get_all_users(
             detail="Failed to retrieve users"
         )
 
-@router.get("/{user_id}")
+@router.get("/{user_id}", response_model=User)
 async def get_user(
-    request: GetUserRequest = Depends(GetUserRequest.query_params),
+    user_id: uuid.UUID = Path(..., description="The ID of the user to retrieve"),
     db: Session = Depends(get_db)
-) -> GetUserResponse:
+):
     """Get a specific user by ID"""
     try:
-        db_user = db.query(Users).filter(Users.id == request.user_id).first()
+        db_user = db.query(Users).filter(Users.id == user_id).first()
         
         if db_user is None:
             raise HTTPException(
@@ -114,16 +82,7 @@ async def get_user(
                 detail="User not found"
             )
         
-        return GetUserResponse(
-            user=UserWithId(
-                id=db_user.id,
-                name=db_user.name,
-                email=db_user.email,
-                notes=db_user.notes or "",
-                minio_resume_id=db_user.minio_resume_id,
-                role=db_user.role
-            )
-        )
+        return db_user
     
     except HTTPException:
         raise
@@ -134,13 +93,13 @@ async def get_user(
             detail="Failed to retrieve user"
         )
 
-@router.put("/{user_id}")
+@router.put("/{user_id}", response_model=User)
 async def update_user(
-    request: UpdateUserRequest,
+    user_data: UserUpdate,
     user_id: uuid.UUID = Path(...),
     db: Session = Depends(get_db),
     minio_client: MinioClient = Depends(get_minio_client)
-) -> UpdateUserResponse:
+):
     """Update a user"""
     try:
         db_user = db.query(Users).filter(Users.id == user_id).first()
@@ -151,34 +110,21 @@ async def update_user(
                 detail="User not found"
             )
         
-        user_data = request.user
-        
         # Check if resume ID is being changed
         if user_data.minio_resume_id and db_user.minio_resume_id != user_data.minio_resume_id:
             # Delete the old resume if it exists
             if db_user.minio_resume_id:
                 minio_client.delete_file(db_user.minio_resume_id)
         
-        # Update user data
-        db_user.name = user_data.name
-        db_user.email = user_data.email
-        db_user.notes = user_data.notes
-        db_user.minio_resume_id = user_data.minio_resume_id
-        db_user.role = user_data.role
+        # Update user data - only update fields that are provided
+        update_data = user_data.model_dump(exclude_unset=True, exclude_none=True)
+        for key, value in update_data.items():
+            setattr(db_user, key, value)
         
         db.commit()
         db.refresh(db_user)
         
-        return UpdateUserResponse(
-            user=UserWithId(
-                id=db_user.id,
-                name=db_user.name,
-                email=db_user.email,
-                notes=db_user.notes or "",
-                minio_resume_id=db_user.minio_resume_id or "",
-                role=db_user.role
-            )
-        )
+        return db_user
     
     except IntegrityError:
         db.rollback()
@@ -196,15 +142,15 @@ async def update_user(
             detail="Failed to update user"
         )
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
-    request: DeleteUserRequest = Depends(DeleteUserRequest.query_params),
+    user_id: uuid.UUID = Path(..., description="The ID of the user to delete"),
     db: Session = Depends(get_db),
     minio_client: MinioClient = Depends(get_minio_client)
 ):
     """Delete a user"""
     try:
-        db_user = db.query(Users).filter(Users.id == request.user_id).first()
+        db_user = db.query(Users).filter(Users.id == user_id).first()
         
         if db_user is None:
             raise HTTPException(

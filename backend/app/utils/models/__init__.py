@@ -1,15 +1,10 @@
 from .users import (
     UserRole,
-    UserWithId,
-    UserWithoutId,
-    CreateUserRequest,
-    CreateUserResponse,
-    GetUserRequest,
-    GetUserResponse,
-    GetUsersResponse,
-    UpdateUserRequest,
-    UpdateUserResponse,
-    DeleteUserRequest,
+    UserBase,
+    UserCreate,
+    UserUpdate,
+    User,
+    UserListResponse,
 )
 from .resume import (
     ResumeUploadResponse,
@@ -40,16 +35,11 @@ from .kanban import (
 
 __all__ = [
     "UserRole",
-    "UserWithId",
-    "UserWithoutId",
-    "CreateUserRequest",
-    "CreateUserResponse",
-    "GetUserRequest",
-    "GetUserResponse",
-    "GetUsersResponse",
-    "UpdateUserRequest",
-    "UpdateUserResponse",
-    "DeleteUserRequest",
+    "UserBase",
+    "UserCreate",
+    "UserUpdate",
+    "User",
+    "UserListResponse",
 
     "ResumeUploadResponse",
     "ResumeDownloadLinkRequest",

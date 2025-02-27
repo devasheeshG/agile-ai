@@ -1,8 +1,8 @@
 import uuid
-from pydantic import BaseModel, EmailStr, AnyHttpUrl
-from fastapi import Path
-from typing import List
+from typing import List, Optional
 from enum import Enum
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from fastapi import Path
 
 class UserRole(str, Enum):
     FRONTEND = "frontend"
@@ -12,29 +12,44 @@ class UserRole(str, Enum):
     QA = "qa"
     DESIGNER = "designer"
 
-class UserWithId(BaseModel):
-    id: uuid.UUID
+class UserBase(BaseModel):
+    """Base user model with common fields"""
     name: str
     email: EmailStr
-    notes: str
+    notes: Optional[str] = None
     minio_resume_id: str
     role: UserRole
 
-class UserWithoutId(BaseModel):
-    name: str
-    email: EmailStr
-    notes: str
-    minio_resume_id: str
-    role: UserRole
+class UserCreate(UserBase):
+    """Model used for creating users"""
+    pass
+
+class UserUpdate(UserBase):
+    """Model used for updating users - all fields are optional"""
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    minio_resume_id: Optional[str] = None
+    role: Optional[UserRole] = None
+
+class User(UserBase):
+    """Complete user model with ID, used for responses"""
+    id: uuid.UUID
+    
+    # Enable ORM mode
+    model_config = ConfigDict(from_attributes=True)
+
+# Response Models
+class UserListResponse(BaseModel):
+    users: List[User]
 
 class CreateUserRequest(BaseModel):
-    user: UserWithoutId
+    user: UserCreate
 
 class CreateUserResponse(BaseModel):
-    user: UserWithId
+    user: User
 
 class GetUsersResponse(BaseModel):
-    users: List[UserWithId]
+    users: List[User]
 
 class GetUserRequest(BaseModel):
     user_id: uuid.UUID
@@ -47,16 +62,13 @@ class GetUserRequest(BaseModel):
         return cls(user_id=user_id)
 
 class GetUserResponse(BaseModel):
-    user: UserWithId
+    user: User
 
 class UpdateUserRequest(BaseModel):
-    # moved to path parameters as i have no idea how to accept both body data and path parameters
-    # in single pydantic model
-    # user_id: uuid.UUID
-    user: UserWithoutId
+    user: UserUpdate
 
 class UpdateUserResponse(BaseModel):
-    user: UserWithId
+    user: User
 
 class DeleteUserRequest(BaseModel):
     user_id: uuid.UUID
