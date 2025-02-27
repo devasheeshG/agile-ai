@@ -23,11 +23,18 @@ class Users(DatabaseBase):
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     notes = Column(String, nullable=True)
-    minio_resume_id = Column(UUID(as_uuid=True), nullable=False)
+    resume_id = Column(UUID(as_uuid=True), ForeignKey("resume_uploads.id"), nullable=False)
     role = Column(Enum(UserRole), nullable=False)
 
     # relationship to tasks
     tasks = relationship("Tasks", back_populates="assignee")
+
+class ResumeUploads(DatabaseBase):
+    __tablename__ = "resume_uploads"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    minio_resume_id = Column(UUID(as_uuid=True), nullable=False)
+    mongodb_resume_id = Column(UUID(as_uuid=True), nullable=False)
 
 class Tasks(DatabaseBase):
     __tablename__ = "tasks"
