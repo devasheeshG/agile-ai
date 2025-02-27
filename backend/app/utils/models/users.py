@@ -67,3 +67,6 @@ class DeleteUserRequest(BaseModel):
         user_id: uuid.UUID = Path(..., title="User ID", description="The ID of the user to delete"),
     ):
         return cls(user_id=user_id)
+
+class GetUserRolesResponse(BaseModel):
+    roles: List[str]

@@ -16,6 +16,7 @@ from app.utils.models import (
     UpdateUserResponse,
     DeleteUserRequest,
     UserWithId,
+    GetUserRolesResponse
 )
 
 router = APIRouter(
@@ -25,6 +26,20 @@ router = APIRouter(
 
 logger = get_logger()
 minio_client = get_minio_client()
+
+@router.get("/roles")
+async def get_user_roles() -> GetUserRolesResponse:
+    """Get all available user roles"""
+    try:
+        # Get all available user roles from the enum
+        roles = [role.value for role in UserRole]
+        return GetUserRolesResponse(roles=roles)
+    except Exception as e:
+        logger.error(f"Error retrieving user roles: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user roles"
+        )
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_user(
