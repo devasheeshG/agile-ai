@@ -103,7 +103,7 @@ async def upload_resume(
             detail=f"Failed to process resume: {str(e)}"
         )
 
-@router.get("/{minio_resume_id}")
+@router.get("/{resume_id}")
 async def get_resume_download_link(
     request: ResumeDownloadLinkRequest = Depends(ResumeDownloadLinkRequest.query_params),
     minio_client: MinioClient = Depends(get_minio_client),
