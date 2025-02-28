@@ -1,11 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCircle, LogOut } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
+import { LayoutDashboard, Users, UserCircle } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
-  const { logout } = useAuthStore();
-
   return (
     <aside className="w-64 bg-secondary border-r border-border h-screen flex flex-col">
       <div className="p-4 border-b border-border">
@@ -31,16 +28,6 @@ const Sidebar: React.FC = () => {
           <span>Account</span>
         </NavLink>
       </nav>
-      
-      <div className="p-4 border-t border-border">
-        <button 
-          onClick={logout}
-          className="nav-link w-full justify-between text-red-400 hover:bg-red-400/10"
-        >
-          <span>Logout</span>
-          <LogOut size={20} />
-        </button>
-      </div>
     </aside>
   );
 };

@@ -32,7 +32,7 @@ const Login: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold flex items-center justify-center gap-2 mb-2">
             <LayoutDashboard className="text-primary" size={32} />
-            <span>AgileAi</span>
+            <span>Agile AI</span>
           </h1>
           <p className="text-gray-400">Sign in to your account</p>
         </div>
