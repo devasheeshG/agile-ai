@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     MONGO_COLLECTION_CHAT: str
 
     def get_mongo_uri(self) -> str:
-        return f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD}@{self.MONGO_HOST}:{self.MONGO_PORT}/{self.MONGO_DB}"
+        return f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD}@{self.MONGO_HOST}:{self.MONGO_PORT}/{self.MONGO_DB}?authSource=admin"
 
     # MinIO Configuration
     MINIO_ENDPOINT: str
