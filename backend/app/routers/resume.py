@@ -75,11 +75,24 @@ async def upload_resume(
         )
         
     try:
-        # Upload to MinIO
-        minio_resume_id = await minio_client.upload_file(resume)
+        # Read file content once
+        content = await resume.read()
         
-        # Extract text from PDF
-        resume_text = await extract_text_from_pdf(resume)
+        # Extract text from PDF using the content
+        pdf_file = io.BytesIO(content)
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        resume_text = ""
+        
+        # Extract text from each page
+        for page_num in range(len(pdf_reader.pages)):
+            page = pdf_reader.pages[page_num]
+            resume_text += page.extract_text() + "\n"
+        
+        # Create a new BytesIO for MinIO upload
+        file_stream = io.BytesIO(content)
+        
+        # Upload to MinIO using the content directly
+        minio_resume_id = await minio_client.upload_file_from_bytes(file_stream, len(content), resume.filename)
         
         # Save text to MongoDB
         mongodb_resume_id = await save_resume_to_mongodb(resume_text)

@@ -33,17 +33,42 @@ class MinioClient:
             logger.error(f"MinIO error: {e}")
             raise
 
-    async def upload_file(self, file: UploadFile) -> str:
-        """Upload file to MinIO and return the generated ID"""
+    # async def upload_file(self, file: UploadFile) -> str:
+    #     """Upload file to MinIO and return the generated ID"""
+    #     try:
+    #         # Generate a unique ID for the file
+    #         file_id = str(uuid.uuid4())
+    #         file_name = f"{file_id}.pdf"
+            
+    #         # Get file content
+    #         file_data = await file.read()
+    #         file_size = len(file_data)
+    #         file_stream = BytesIO(file_data)
+            
+    #         # Upload the file to MinIO
+    #         self.client.put_object(
+    #             self.bucket_name,
+    #             file_name,
+    #             file_stream,
+    #             file_size,
+    #             content_type="application/pdf"
+    #         )
+            
+    #         logger.info(f"Successfully uploaded file {file_name} to bucket {self.bucket_name}")
+    #         return file_id
+            
+    #     except S3Error as e:
+    #         logger.error(f"Error uploading file to MinIO: {e}")
+    #         raise
+    #     finally:
+    #         await file.close()
+
+    async def upload_file_from_bytes(self, file_stream: BytesIO, file_size: int, original_filename: str = None) -> str:
+        """Upload file from BytesIO stream to MinIO and return the generated ID"""
         try:
             # Generate a unique ID for the file
             file_id = str(uuid.uuid4())
             file_name = f"{file_id}.pdf"
-            
-            # Get file content
-            file_data = await file.read()
-            file_size = len(file_data)
-            file_stream = BytesIO(file_data)
             
             # Upload the file to MinIO
             self.client.put_object(
@@ -60,8 +85,6 @@ class MinioClient:
         except S3Error as e:
             logger.error(f"Error uploading file to MinIO: {e}")
             raise
-        finally:
-            await file.close()
 
     def delete_file(self, file_id: str) -> bool:
         """Delete a file from MinIO"""
