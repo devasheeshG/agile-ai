@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from openai import OpenAI
+import json
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.utils.postgres import get_db, Users, Tasks
+from app.utils.postgres import get_db, Users, Tasks, ResumeUploads
 from app.utils.models import (
     Message,
     ChatRequest,
@@ -12,7 +13,6 @@ from app.utils.models import (
 )
 from app.config import get_settings
 from app.logger import get_logger
-import json
 
 router = APIRouter(
     prefix="/assistant",
@@ -27,6 +27,7 @@ oai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 mongo_client = AsyncIOMotorClient(settings.get_mongo_uri())
 mongo_db = mongo_client[settings.MONGO_DB]
 chat_collection = mongo_db[settings.MONGO_COLLECTION_CHAT]
+resumes_collection = mongo_db[settings.MONGO_COLLECTION_RESUMES]
 
 async def add_message_to_chat(role: str, content: str):
     """
@@ -74,6 +75,24 @@ async def get_chat_history() -> List[Message]:
     
     logger.info(f"Retrieved {len(messages)} messages for chat with ID: default")
     return messages
+
+async def get_resume_text(mongodb_resume_id: str) -> str:
+    """
+    Get resume text from MongoDB
+    Args:
+        mongodb_resume_id: ID of the resume in MongoDB
+    Returns:
+        Resume text
+    """
+    try:
+        resume_doc = await resumes_collection.find_one({"_id": str(mongodb_resume_id)})
+        if not resume_doc or "text" not in resume_doc:
+            logger.warning(f"Resume text not found for ID: {mongodb_resume_id}")
+            return "Resume text not available"
+        return resume_doc["text"]
+    except Exception as e:
+        logger.error(f"Error retrieving resume text: {str(e)}")
+        return "Error retrieving resume text"
 
 async def create_task_internal(
     title: str,
@@ -185,7 +204,7 @@ If the user doesn't specify all required information, ask follow-up questions to
 
 Be conversational and helpful. If users ask questions about task management in general, answer them.
 
-You can also help users find the right assignee for a task by suggesting users from the available list.
+You can also help users find the right assignee for a task by suggesting users based on their skills and resume content.
 """
 
 @router.post("/chat", response_model=ChatResponse)
@@ -195,13 +214,22 @@ async def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db
         # Fetch users and tasks from the database
         users = db.query(Users).all()
         tasks = db.query(Tasks).all()
-
-        # Format users into a readable format for the prompt
-        formatted_users = "\n".join([
-            f"- ID: {user.id}, Name: {user.name}, Email: {user.email}, Role: {user.role}"
-            for user in users
-        ])
-
+        
+        # Format users with their resume content included directly with each user
+        formatted_users = []
+        for user in users:
+            # Get basic user details
+            user_details = f"- USER ID: {user.id}, Name: {user.name}, Email: {user.email}, Role: {user.role}"
+            
+            # Get resume content
+            resume_text = "Resume not available"
+            resume_upload = db.query(ResumeUploads).filter(ResumeUploads.id == user.resume_id).first()
+            if resume_upload:
+                resume_text = await get_resume_text(resume_upload.mongodb_resume_id)
+            
+            # Add user with resume content
+            formatted_users.append(f"{user_details}\nRESUME:\n{resume_text}\n")
+        
         # Format tasks into a readable format for the prompt
         formatted_tasks = "\n".join([
             f"- ID: {task.id}, Title: {task.title}, Status: {task.status}, " +
@@ -214,7 +242,7 @@ async def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db
 {SYSTEM_PROMPT}
 
 AVAILABLE USERS:
-{formatted_users}
+{"".join(formatted_users)}
 
 EXISTING TASKS:
 {formatted_tasks}
@@ -328,7 +356,7 @@ EXISTING TASKS:
         # Add the new user message to MongoDB
         await add_message_to_chat("user", request.user_message)
         
-        # Compile full message history with system message, previous messages, and new user message
+        # Prepare messages for API call
         messages = [system_message] + previous_messages_dict + [{"role": "user", "content": request.user_message}]
         
         # Call OpenAI API
@@ -339,40 +367,22 @@ EXISTING TASKS:
             tool_choice="auto"
         )
         
+        # Process the response
         response_message = response.choices[0].message
         
         # Check if the model wants to call a function
-        if response_message.tool_calls:
-            # Handle the function calls
-            for tool_call in response_message.tool_calls:
+        tool_calls = response_message.tool_calls
+        if tool_calls:
+            # Process each tool call
+            for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments)
                 
-                # Process different function calls
+                # Execute the requested function
+                tool_response = None
                 if function_name == "create_task":
-                    # Create task in database
-                    task_created = await create_task_internal(
-                        title=function_args["title"],
-                        description=function_args["description"],
-                        assignee_id=function_args["assignee_id"],
-                        priority=function_args.get("priority", "medium"),
-                        status=function_args.get("status", "todo"),
-                        db=db
-                    )
-                    
-                    # Add the result of the function call
-                    messages.append(response_message.model_dump())
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": function_name,
-                        "content": json.dumps({"task_id": str(task_created.id), "success": True})
-                    })
-                
-                elif function_name == "edit_task":
-                    # Edit task in database
-                    task_edited = await edit_task_internal(
-                        task_id=function_args["task_id"],
+                    # Create a new task
+                    task = await create_task_internal(
                         title=function_args.get("title"),
                         description=function_args.get("description"),
                         assignee_id=function_args.get("assignee_id"),
@@ -380,58 +390,57 @@ EXISTING TASKS:
                         status=function_args.get("status"),
                         db=db
                     )
+                    tool_response = f"Task created successfully with ID: {task.id}"
                     
-                    # Add the result of the function call
-                    messages.append(response_message.model_dump())
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": function_name,
-                        "content": json.dumps({"task_id": str(task_edited.id), "success": True})
-                    })
-                
-                elif function_name == "delete_task":
-                    # Delete task in database
-                    success = await delete_task_internal(
-                        task_id=function_args["task_id"],
+                elif function_name == "edit_task":
+                    # Edit an existing task
+                    task = await edit_task_internal(
+                        task_id=function_args.get("task_id"),
+                        title=function_args.get("title"),
+                        description=function_args.get("description"),
+                        assignee_id=function_args.get("assignee_id"),
+                        priority=function_args.get("priority"),
+                        status=function_args.get("status"),
                         db=db
                     )
+                    tool_response = f"Task {task.id} updated successfully"
                     
-                    # Add the result of the function call
-                    messages.append(response_message.model_dump())
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": function_name,
-                        "content": json.dumps({"success": success})
-                    })
+                elif function_name == "delete_task":
+                    # Delete an existing task
+                    await delete_task_internal(
+                        task_id=function_args.get("task_id"),
+                        db=db
+                    )
+                    tool_response = f"Task {function_args.get('task_id')} deleted successfully"
             
-            # Get a new response from the model with the function results
+                # Append the tool response to messages
+                messages.append({
+                    "role": "tool",
+                    "name": function_name,
+                    "content": tool_response
+                })
+            
+            # Continue the conversation with the tool response
             second_response = oai_client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
-                messages=messages
+                messages=messages,
             )
             
             assistant_response = second_response.choices[0].message.content
-            
-            # Store assistant's response in MongoDB
-            await add_message_to_chat("assistant", assistant_response)
-            
-            return ChatResponse(assistant_response=assistant_response)
+        else:
+            # Get the assistant's response
+            assistant_response = response_message.content
         
-        # If no function call, just return the response
-        assistant_response = response_message.content
-        
-        # Store assistant's response in MongoDB
+        # Save assistant's response to chat history
         await add_message_to_chat("assistant", assistant_response)
         
         return ChatResponse(assistant_response=assistant_response)
     
     except Exception as e:
-        logger.error(f"Error in chat with assistant: {str(e)}")
+        logger.error(f"Error in chat endpoint: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process chat: {str(e)}"
+            detail=f"Error processing request: {str(e)}"
         )
 
 @router.get("/history", response_model=GetChatHistoryResponse)
@@ -442,8 +451,8 @@ async def get_chat_history_route() -> GetChatHistoryResponse:
         return GetChatHistoryResponse(messages=messages)
     
     except Exception as e:
-        logger.error(f"Error in get_chat_history: {str(e)}")
+        logger.error(f"Error retrieving chat history: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get chat history: {str(e)}"
+            detail=f"Error retrieving chat history: {str(e)}"
         )
