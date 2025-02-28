@@ -25,7 +25,7 @@ def upgrade() -> None:
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('notes', sa.String(), nullable=True),
-    sa.Column('minio_resume_id', sa.UUID(), nullable=False),
+    sa.Column('resume_id', sa.UUID(), nullable=False),
     sa.Column('role', sa.Enum('FRONTEND', 'BACKEND', 'FULLSTACK', 'DEVOPS', 'QA', 'DESIGNER', name='userrole'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')

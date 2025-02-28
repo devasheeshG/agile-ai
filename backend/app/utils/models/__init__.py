@@ -35,6 +35,12 @@ from .kanban import (
     UpdateTaskTitleRequest,
     UpdateTaskDescriptionRequest,
 )
+from .assistant import (
+    Message,
+    ChatRequest,
+    ChatResponse,
+    GetChatHistoryResponse,
+)
 
 __all__ = [
     "UserRole",
@@ -70,4 +76,9 @@ __all__ = [
     "UpdateTaskPriorityRequest",
     "UpdateTaskTitleRequest",
     "UpdateTaskDescriptionRequest",
+
+    "Message",
+    "ChatRequest",
+    "ChatResponse",
+    "GetChatHistoryResponse",
 ]

@@ -25,6 +25,10 @@ python-multipart = "^0.0.20"
 pymongo = "^4.11.1"
 motor = "^3.7.0"
 pdf2image = "^1.17.0"
+langchain = "^0.3.19"
+langchain-openai = "^0.3.7"
+langchain-mongodb = "^0.5.0"
+langchain-community = "^0.3.18"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"

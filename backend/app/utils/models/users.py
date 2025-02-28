@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, EmailStr, AnyHttpUrl
+from pydantic import BaseModel, EmailStr
 from fastapi import Path
 from typing import List
 from enum import Enum
