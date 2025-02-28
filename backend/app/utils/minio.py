@@ -97,6 +97,26 @@ class MinioClient:
             logger.error(f"Error generating download link: {e}")
             raise
 
+    def get_file_content(self, file_id: str) -> bytes:
+        """
+        Get the content of a file from MinIO
+        Args:
+            file_id: The ID of the file
+        Returns:
+            The file content as bytes
+        """
+        try:
+            file_name = f"{file_id}.pdf"
+            response = self.client.get_object(self.bucket_name, file_name)
+            data = response.read()
+            response.close()
+            response.release_conn()
+            logger.info(f"Successfully retrieved file {file_name} from bucket {self.bucket_name}")
+            return data
+        except S3Error as e:
+            logger.error(f"Error retrieving file from MinIO: {e}")
+            raise
+
 @lru_cache
 def get_minio_client():
     return MinioClient()

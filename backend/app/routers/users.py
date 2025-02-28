@@ -16,6 +16,7 @@ from app.utils.models import (
     UpdateUserResponse,
     DeleteUserRequest,
     UserWithId,
+    GetUserRolesResponse
 )
 
 router = APIRouter(
@@ -25,6 +26,20 @@ router = APIRouter(
 
 logger = get_logger()
 minio_client = get_minio_client()
+
+@router.get("/roles")
+async def get_user_roles() -> GetUserRolesResponse:
+    """Get all available user roles"""
+    try:
+        # Get all available user roles from the enum
+        roles = [role.value for role in UserRole]
+        return GetUserRolesResponse(roles=roles)
+    except Exception as e:
+        logger.error(f"Error retrieving user roles: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user roles"
+        )
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -39,7 +54,7 @@ async def create_user(
             name=user_data.name,
             email=user_data.email,
             notes=user_data.notes,
-            minio_resume_id=user_data.minio_resume_id,
+            resume_id=user_data.resume_id,
             role=user_data.role
         )
         
@@ -53,7 +68,7 @@ async def create_user(
                 name=db_user.name,
                 email=db_user.email,
                 notes=db_user.notes,
-                minio_resume_id=db_user.minio_resume_id,
+                resume_id=db_user.resume_id,
                 role=db_user.role
             )
         )
@@ -86,7 +101,7 @@ async def get_all_users(
             name=user.name,
             email=user.email,
             notes=user.notes or "",
-            minio_resume_id=user.minio_resume_id,
+            resume_id=user.resume_id,
             role=user.role
         ) for user in db_users]
         
@@ -120,7 +135,7 @@ async def get_user(
                 name=db_user.name,
                 email=db_user.email,
                 notes=db_user.notes or "",
-                minio_resume_id=db_user.minio_resume_id,
+                resume_id=db_user.resume_id,
                 role=db_user.role
             )
         )
@@ -154,16 +169,16 @@ async def update_user(
         user_data = request.user
         
         # Check if resume ID is being changed
-        if user_data.minio_resume_id and db_user.minio_resume_id != user_data.minio_resume_id:
+        if user_data.resume_id and db_user.resume_id != user_data.resume_id:
             # Delete the old resume if it exists
-            if db_user.minio_resume_id:
-                minio_client.delete_file(db_user.minio_resume_id)
+            if db_user.resume_id:
+                minio_client.delete_file(db_user.resume_id)
         
         # Update user data
         db_user.name = user_data.name
         db_user.email = user_data.email
         db_user.notes = user_data.notes
-        db_user.minio_resume_id = user_data.minio_resume_id
+        db_user.resume_id = user_data.resume_id
         db_user.role = user_data.role
         
         db.commit()
@@ -175,7 +190,7 @@ async def update_user(
                 name=db_user.name,
                 email=db_user.email,
                 notes=db_user.notes or "",
-                minio_resume_id=db_user.minio_resume_id or "",
+                resume_id=db_user.resume_id or "",
                 role=db_user.role
             )
         )
@@ -213,8 +228,8 @@ async def delete_user(
             )
         
         # Delete the resume from MinIO if it exists
-        if db_user.minio_resume_id:
-            minio_client.delete_file(db_user.minio_resume_id)
+        if db_user.resume_id:
+            minio_client.delete_file(db_user.resume_id)
         
         # Delete the user from the database
         db.delete(db_user)

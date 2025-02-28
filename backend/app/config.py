@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     MONGO_PORT: str
     MONGO_DB: str
     MONGO_COLLECTION_RESUMES: str
+    MONGO_COLLECTION_CHAT: str
 
     def get_mongo_uri(self) -> str:
         return f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD}@{self.MONGO_HOST}:{self.MONGO_PORT}/{self.MONGO_DB}"
@@ -35,6 +36,10 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str
     MINIO_BUCKET_NAME: str
     MINIO_SECURE: bool
+
+    # OpenAI Configuration
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
 
     class Config:
         env_file = ".env"

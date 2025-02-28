@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, EmailStr, AnyHttpUrl
+from pydantic import BaseModel, EmailStr
 from fastapi import Path
 from typing import List
 from enum import Enum
@@ -17,14 +17,14 @@ class UserWithId(BaseModel):
     name: str
     email: EmailStr
     notes: str
-    minio_resume_id: str
+    resume_id: str
     role: UserRole
 
 class UserWithoutId(BaseModel):
     name: str
     email: EmailStr
     notes: str
-    minio_resume_id: str
+    resume_id: str
     role: UserRole
 
 class CreateUserRequest(BaseModel):
@@ -67,3 +67,6 @@ class DeleteUserRequest(BaseModel):
         user_id: uuid.UUID = Path(..., title="User ID", description="The ID of the user to delete"),
     ):
         return cls(user_id=user_id)
+
+class GetUserRolesResponse(BaseModel):
+    roles: List[str]

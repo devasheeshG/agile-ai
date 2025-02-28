@@ -10,6 +10,7 @@ from .users import (
     UpdateUserRequest,
     UpdateUserResponse,
     DeleteUserRequest,
+    GetUserRolesResponse
 )
 from .resume import (
     ResumeUploadResponse,
@@ -34,6 +35,12 @@ from .kanban import (
     UpdateTaskTitleRequest,
     UpdateTaskDescriptionRequest,
 )
+from .assistant import (
+    Message,
+    ChatRequest,
+    ChatResponse,
+    GetChatHistoryResponse,
+)
 
 __all__ = [
     "UserRole",
@@ -47,6 +54,7 @@ __all__ = [
     "UpdateUserRequest",
     "UpdateUserResponse",
     "DeleteUserRequest",
+    "GetUserRolesResponse",
 
     "ResumeUploadResponse",
     "ResumeDownloadLinkRequest",
@@ -68,4 +76,9 @@ __all__ = [
     "UpdateTaskPriorityRequest",
     "UpdateTaskTitleRequest",
     "UpdateTaskDescriptionRequest",
+
+    "Message",
+    "ChatRequest",
+    "ChatResponse",
+    "GetChatHistoryResponse",
 ]
