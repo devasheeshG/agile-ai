@@ -1,44 +1,31 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
-
-// Layouts
-import Layout from './components/Layout';
-
-// Pages
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Team from './pages/Team';
 import Account from './pages/Account';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import Sidebar from './components/Sidebar';
 
-// Protected route component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuthStore();
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
+// Create a layout component directly in App.tsx since MainLayout is not available
+const AppLayout = () => {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1 p-6 overflow-y-auto">
+        <Routes>
+          <Route index element={<Dashboard />} />
+          <Route path="team" element={<Team />} />
+          <Route path="account" element={<Account />} />
+        </Routes>
+      </main>
+    </div>
+  );
 };
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Dashboard />} />
-          <Route path="team" element={<Team />} />
-          <Route path="account" element={<Account />} />
-        </Route>
+        <Route path="/*" element={<AppLayout />} />
       </Routes>
     </BrowserRouter>
   );

@@ -3,7 +3,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import TeamCard from '../components/TeamCard';
 import { useAuthStore } from '../store/authStore';
 import { useTaskStore } from '../store/taskStore';
-import { LayoutDashboard, CheckCircle2, Clock, AlertCircle, Flag } from 'lucide-react';
+import { LayoutDashboard, CheckCircle2, Clock, AlertCircle, Flag, ClipboardList } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
