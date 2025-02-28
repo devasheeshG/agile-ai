@@ -17,14 +17,14 @@ class UserWithId(BaseModel):
     name: str
     email: EmailStr
     notes: str
-    resume_id: str
+    resume_id: uuid.UUID
     role: UserRole
 
 class UserWithoutId(BaseModel):
     name: str
     email: EmailStr
     notes: str
-    resume_id: str
+    resume_id: uuid.UUID
     role: UserRole
 
 class CreateUserRequest(BaseModel):
