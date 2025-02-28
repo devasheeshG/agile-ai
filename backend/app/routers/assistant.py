@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-import uuid
 from openai import OpenAI
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -33,7 +32,6 @@ async def add_message_to_chat(role: str, content: str):
     """
     Add a message to an existing chat or create a new chat
     Args:
-        chat_id: ID of the chat
         role: Role of the message sender (user or assistant)
         content: Message content
     Returns:
@@ -45,7 +43,7 @@ async def add_message_to_chat(role: str, content: str):
     }
     
     # Try to update existing chat document
-    result = await chat_collection.update_one(
+    await chat_collection.update_one(
         {"_id": "default"},
         {"$push": {"messages": message}},
         upsert=True  # Create if not exists
@@ -72,7 +70,6 @@ async def get_chat_history() -> List[Message]:
         messages.append(Message(
             role=msg["role"],
             content=msg["content"],
-            timestamp=msg.get("timestamp")
         ))
     
     logger.info(f"Retrieved {len(messages)} messages for chat with ID: default")

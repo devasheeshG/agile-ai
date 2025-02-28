@@ -9,7 +9,7 @@ class ChatRequest(BaseModel):
     user_message: str
 
 class ChatResponse(BaseModel):
-    asistant_response: str
+    assistant_response: str
 
 class GetChatHistoryResponse(BaseModel):
     messages: List[Message]
