@@ -315,13 +315,21 @@ EXISTING TASKS:
             }
         ]
         
-        # Create system message and compile message history
+        # Create system message
         system_message = {
             "role": "system", 
             "content": dynamic_system_prompt
         }
         
-        messages = [system_message] + [msg.model_dump() for msg in request.messages]
+        # Retrieve chat history from MongoDB
+        previous_messages = await get_chat_history()
+        previous_messages_dict = [msg.model_dump() for msg in previous_messages]
+        
+        # Add the new user message to MongoDB
+        await add_message_to_chat("user", request.user_message)
+        
+        # Compile full message history with system message, previous messages, and new user message
+        messages = [system_message] + previous_messages_dict + [{"role": "user", "content": request.user_message}]
         
         # Call OpenAI API
         response = oai_client.chat.completions.create(
@@ -404,20 +412,20 @@ EXISTING TASKS:
                 messages=messages
             )
             
-            return ChatResponse(
-                message=Message(
-                    role="assistant",
-                    content=second_response.choices[0].message.content
-                )
-            )
+            assistant_response = second_response.choices[0].message.content
+            
+            # Store assistant's response in MongoDB
+            await add_message_to_chat("assistant", assistant_response)
+            
+            return ChatResponse(assistant_response=assistant_response)
         
         # If no function call, just return the response
-        return ChatResponse(
-            message=Message(
-                role="assistant",
-                content=response_message.content
-            )
-        )
+        assistant_response = response_message.content
+        
+        # Store assistant's response in MongoDB
+        await add_message_to_chat("assistant", assistant_response)
+        
+        return ChatResponse(assistant_response=assistant_response)
     
     except Exception as e:
         logger.error(f"Error in chat with assistant: {str(e)}")
